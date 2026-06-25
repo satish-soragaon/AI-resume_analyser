@@ -5,7 +5,24 @@ import google.generativeai as genai
 from flask import Flask, request, render_template, redirect
 from werkzeug.utils import secure_filename
 import PyPDF2
+from docx import Document
 import json
+
+ALLOWED_EXTENSIONS = {'.pdf', '.docx', '.txt'}
+
+def extract_text(filepath):
+    ext = os.path.splitext(filepath)[1].lower()
+    if ext == '.pdf':
+        with open(filepath, 'rb') as f:
+            reader = PyPDF2.PdfReader(f)
+            return "".join(p.extract_text() for p in reader.pages if p.extract_text())
+    elif ext == '.docx':
+        doc = Document(filepath)
+        return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+    elif ext == '.txt':
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            return f.read()
+    return ""
 
 # ---------------- CONFIG ----------------
 UPLOAD_FOLDER = 'uploads'
@@ -129,7 +146,8 @@ def index():
         if file.filename == '':
             return redirect(request.url)
 
-        if file and file.filename.endswith('.pdf'):
+        ext = os.path.splitext(file.filename)[1].lower()
+        if file and ext in ALLOWED_EXTENSIONS:
             filename = secure_filename(file.filename)
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
@@ -139,17 +157,10 @@ def index():
 
             try:
                 file.save(filepath)
-
-                with open(filepath, 'rb') as f:
-                    pdf_reader = PyPDF2.PdfReader(f)
-                    text = "".join(
-                        page.extract_text()
-                        for page in pdf_reader.pages
-                        if page.extract_text()
-                    )
+                text = extract_text(filepath)
 
                 if not text.strip():
-                    error_message = "Could not extract text from PDF"
+                    error_message = "Could not extract text from the file. Make sure it is not a scanned image."
                 else:
                     analysis_results = analyze_resume(text, job_description)
 

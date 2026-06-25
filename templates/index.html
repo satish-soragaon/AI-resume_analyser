@@ -38,9 +38,9 @@
                 <div class="upload-section" id="dropZone">
                     <div class="upload-icon">📄</div>
                     <div class="upload-text">
-                        <label for="resumeFile" class="file-label">Choose a PDF file</label>
-                        <input type="file" name="resume" id="resumeFile" accept=".pdf" required>
-                        <p class="file-hint">or drag and drop your resume here</p>
+                        <label for="resumeFile" class="file-label">Choose a file</label>
+                        <input type="file" name="resume" id="resumeFile" accept=".pdf,.docx,.txt" required>
+                        <p class="file-hint">PDF, DOCX or TXT &nbsp;·&nbsp; drag and drop supported</p>
                     </div>
                     <button type="submit" class="btn">Analyze My Resume</button>
                 </div>
@@ -299,7 +299,8 @@
                 e.preventDefault();
                 dropZone.classList.remove('dragover');
                 const file = e.dataTransfer.files[0];
-                if (file && file.type === 'application/pdf') {
+                const allowed = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+                if (file && (allowed.includes(file.type) || file.name.match(/\.(pdf|docx|txt)$/i))) {
                     const input = document.getElementById('resumeFile');
                     const dt = new DataTransfer();
                     dt.items.add(file);
