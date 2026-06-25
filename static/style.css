@@ -145,7 +145,7 @@ body {
     background: var(--blue);
     display: flex; align-items: center; justify-content: center;
     font-family: 'Manrope', sans-serif;
-    font-weight: 800; font-size: 0.95em;
+    font-weight: 800; font-size: 0.72em;
     color: #fff;
     box-shadow: 0 0 20px rgba(94,107,255,0.4);
 }
