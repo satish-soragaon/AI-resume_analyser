@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Resume Analyzer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <!-- Animated Background Blobs -->
+    <div class="bg-blobs" aria-hidden="true">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+        <div class="blob blob-4"></div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loader-content">
+            <div class="spinner"></div>
+            <p class="loader-text">Analyzing your resume<span class="dots"></span></p>
+            <p class="loader-sub">Powered by Gemini AI</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>AI Resume Analyzer</h1>
+            <p>Upload your PDF resume to get instant AI-powered feedback and ATS optimization tips.</p>
+        </header>
+
+        <main>
+            <form action="/" method="post" enctype="multipart/form-data" id="uploadForm">
+
+                <!-- Upload Zone -->
+                <div class="upload-section" id="dropZone">
+                    <div class="upload-icon">📄</div>
+                    <div class="upload-text">
+                        <label for="resumeFile" class="file-label">Choose a PDF file</label>
+                        <input type="file" name="resume" id="resumeFile" accept=".pdf" required>
+                        <p class="file-hint">or drag and drop your resume here</p>
+                    </div>
+                    <button type="submit" class="btn">Analyze My Resume</button>
+                </div>
+                <p class="selected-file" id="selectedFile"></p>
+
+                <!-- Job Description (optional) -->
+                <div class="jd-section">
+                    <button type="button" class="jd-toggle" id="jdToggle">
+                        <span class="jd-toggle-icon">＋</span>
+                        Match against a Job Description <span class="jd-badge">Boost your score</span>
+                    </button>
+                    <div class="jd-body" id="jdBody">
+                        <label class="jd-label" for="jobDescription">Paste the job description below</label>
+                        <textarea
+                            name="job_description"
+                            id="jobDescription"
+                            class="jd-textarea"
+                            rows="7"
+                            placeholder="e.g. We are looking for a Python developer with experience in Flask, REST APIs, and cloud deployment..."></textarea>
+                        <p class="jd-hint">Optional — when provided, you'll also get a match score, keyword gap analysis, and role-specific tailoring tips.</p>
+                    </div>
+                </div>
+
+            </form>
+
+            {% if error %}
+                <div class="error-message animate-in">
+                    <p><strong>Error:</strong> {{ error }}</p>
+                </div>
+            {% endif %}
+
+            {% if results %}
+                <div class="results-section">
+                    <h2 class="animate-in">Analysis Complete</h2>
+
+                    <!-- JD Match Card (shown only when JD was provided) -->
+                    {% if results.has_jd %}
+                    <div class="card jd-match-card animate-in" style="--delay: 0.05s">
+                        <h3>Job Description Match</h3>
+                        <div class="score-wrapper">
+                            <div class="score-circle-container">
+                                <svg class="score-ring" viewBox="0 0 120 120">
+                                    <circle class="score-ring-bg" cx="60" cy="60" r="54"/>
+                                    <circle class="score-ring-fill" cx="60" cy="60" r="54"
+                                        style="--target-offset: {{ (339.3 * (100 - results.jd_match_score) / 100) | round(2) }};
+                                               --score-color: {% if results.jd_match_score >= 70 %}#27ae60{% elif results.jd_match_score >= 40 %}#e67e22{% else %}#e74c3c{% endif %}"/>
+                                </svg>
+                                <div class="score-text">
+                                    <span class="score-number" data-score="{{ results.jd_match_score }}">0</span>
+                                    <span class="score-label">match</span>
+                                </div>
+                            </div>
+                            <div class="score-breakdown">
+                                <div class="score-grade {% if results.jd_match_score >= 70 %}grade-good{% elif results.jd_match_score >= 40 %}grade-ok{% else %}grade-poor{% endif %}">
+                                    {% if results.jd_match_score >= 70 %}Strong Match
+                                    {% elif results.jd_match_score >= 40 %}Partial Match
+                                    {% else %}Weak Match
+                                    {% endif %}
+                                </div>
+                                <p class="score-desc">
+                                    {% if results.jd_match_score >= 70 %}Your resume aligns well with this role.
+                                    {% elif results.jd_match_score >= 40 %}Your resume partially fits — see tailoring tips below.
+                                    {% else %}Your resume needs significant changes to target this role.
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+
+                        {% if results.matched_keywords %}
+                        <div class="keyword-section">
+                            <p class="keyword-heading">Keywords matched</p>
+                            <div class="skills-list">
+                                {% for kw in results.matched_keywords %}
+                                    <span class="skill-tag found" style="--tag-delay: {{ loop.index0 * 0.04 }}s">{{ kw }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if results.missing_keywords %}
+                        <div class="keyword-section">
+                            <p class="keyword-heading">Keywords missing from your resume</p>
+                            <div class="skills-list">
+                                {% for kw in results.missing_keywords %}
+                                    <span class="skill-tag missing" style="--tag-delay: {{ loop.index0 * 0.04 }}s">{{ kw }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if results.tailoring_tips %}
+                        <div class="keyword-section">
+                            <p class="keyword-heading">Tailoring tips for this role</p>
+                            <ul class="suggestion-list">
+                                {% for tip in results.tailoring_tips %}
+                                    <li class="suggestion-item tailoring-item">{{ tip }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Overall Resume Score -->
+                    <div class="card score-card animate-in" style="--delay: 0.1s">
+                        <h3>Overall Resume Score</h3>
+                        <div class="score-wrapper">
+                            <div class="score-circle-container">
+                                <svg class="score-ring" viewBox="0 0 120 120">
+                                    <circle class="score-ring-bg" cx="60" cy="60" r="54"/>
+                                    <circle class="score-ring-fill" cx="60" cy="60" r="54"
+                                        style="--target-offset: {{ (339.3 * (100 - results.score) / 100) | round(2) }};
+                                               --score-color: {% if results.score >= 70 %}#27ae60{% elif results.score >= 40 %}#e67e22{% else %}#e74c3c{% endif %}"/>
+                                </svg>
+                                <div class="score-text">
+                                    <span class="score-number" data-score="{{ results.score }}">0</span>
+                                    <span class="score-label">/ 100</span>
+                                </div>
+                            </div>
+                            <div class="score-breakdown">
+                                <div class="score-grade {% if results.score >= 70 %}grade-good{% elif results.score >= 40 %}grade-ok{% else %}grade-poor{% endif %}">
+                                    {% if results.score >= 70 %}Strong Resume
+                                    {% elif results.score >= 40 %}Needs Work
+                                    {% else %}Needs Major Improvement
+                                    {% endif %}
+                                </div>
+                                <p class="score-desc">
+                                    {% if results.score >= 70 %}Your resume is well-structured and competitive.
+                                    {% elif results.score >= 40 %}Your resume has potential but needs some improvements.
+                                    {% else %}Your resume needs significant work to be competitive.
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section Completeness -->
+                    {% if results.sections %}
+                    {% set sections_meta = [
+                        {'key': 'contact_info',         'label': 'Contact Info',         'icon': '📧'},
+                        {'key': 'professional_summary', 'label': 'Professional Summary', 'icon': '📝'},
+                        {'key': 'work_experience',      'label': 'Work Experience',       'icon': '💼'},
+                        {'key': 'education',            'label': 'Education',             'icon': '🎓'},
+                        {'key': 'skills_section',       'label': 'Skills Section',        'icon': '⚡'},
+                        {'key': 'projects',             'label': 'Projects',              'icon': '🚀'},
+                        {'key': 'certifications',       'label': 'Certifications',        'icon': '🏆'}
+                    ] %}
+                    <div class="card animate-in" style="--delay: 0.2s">
+                        <h3>Section Completeness</h3>
+                        <div class="sections-grid">
+                            {% for item in sections_meta %}
+                                {% set present = results.sections[item.key] if item.key in results.sections else false %}
+                                <div class="section-item {{ 'present' if present else 'missing' }}">
+                                    <span class="section-icon">{{ item.icon }}</span>
+                                    <span class="section-name">{{ item.label }}</span>
+                                    <span class="section-status">{{ '✓' if present else '✗' }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Skills Found -->
+                    <div class="card animate-in" style="--delay: 0.3s">
+                        <h3>Skills Found</h3>
+                        {% if results.skills %}
+                            <div class="skills-list">
+                                {% for skill in results.skills %}
+                                    <span class="skill-tag found" style="--tag-delay: {{ loop.index0 * 0.05 }}s">{{ skill }}</span>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p>No specific skills were identified in your resume.</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Missing Skills -->
+                    <div class="card animate-in" style="--delay: 0.4s">
+                        <h3>Potential Skills to Add</h3>
+                        <p class="card-subtitle">Consider adding these relevant skills if you have them:</p>
+                        <div class="skills-list">
+                            {% for skill in results.missing_skills[:10] %}
+                                <span class="skill-tag missing" style="--tag-delay: {{ loop.index0 * 0.05 }}s">{{ skill }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Suggestions -->
+                    <div class="card animate-in" style="--delay: 0.5s">
+                        <h3>Suggestions for Improvement</h3>
+                        <ul class="suggestion-list">
+                            {% for suggestion in results.suggestions %}
+                                <li class="suggestion-item">{{ suggestion }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
+                    <!-- ATS Tips -->
+                    {% if results.ats_tips %}
+                    <div class="card ats-card animate-in" style="--delay: 0.6s">
+                        <h3>ATS Optimization Tips</h3>
+                        <p class="card-subtitle">Help your resume pass Applicant Tracking Systems:</p>
+                        <ul class="suggestion-list">
+                            {% for tip in results.ats_tips %}
+                                <li class="suggestion-item ats-item">{{ tip }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                </div>
+            {% endif %}
+        </main>
+    </div>
+
+    <script>
+        // Loading overlay
+        document.getElementById('uploadForm').addEventListener('submit', function () {
+            document.getElementById('loadingOverlay').classList.add('active');
+        });
+
+        // Show selected filename
+        document.getElementById('resumeFile').addEventListener('change', function () {
+            const name = this.files[0] ? this.files[0].name : '';
+            document.getElementById('selectedFile').textContent = name ? `Selected: ${name}` : '';
+        });
+
+        // Animate ALL score counters on the page
+        document.querySelectorAll('.score-number').forEach(el => {
+            const target = parseInt(el.dataset.score, 10);
+            let current = 0;
+            const step = target / 60;
+            const timer = setInterval(() => {
+                current = Math.min(current + step, target);
+                el.textContent = Math.round(current);
+                if (current >= target) clearInterval(timer);
+            }, 16);
+        });
+
+        // JD toggle accordion
+        const jdToggle = document.getElementById('jdToggle');
+        const jdBody = document.getElementById('jdBody');
+        if (jdToggle) {
+            jdToggle.addEventListener('click', function () {
+                const open = jdBody.classList.toggle('open');
+                jdToggle.querySelector('.jd-toggle-icon').textContent = open ? '－' : '＋';
+            });
+        }
+
+        // Drag-and-drop
+        const dropZone = document.getElementById('dropZone');
+        if (dropZone) {
+            dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+            dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+            dropZone.addEventListener('drop', e => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                const file = e.dataTransfer.files[0];
+                if (file && file.type === 'application/pdf') {
+                    const input = document.getElementById('resumeFile');
+                    const dt = new DataTransfer();
+                    dt.items.add(file);
+                    input.files = dt.files;
+                    document.getElementById('selectedFile').textContent = `Selected: ${file.name}`;
+                }
+            });
+        }
+    </script>
+</body>
+</html>
